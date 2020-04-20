@@ -13,7 +13,7 @@ Install the package by adding `freshness` to your list of dependencies in `mix.e
 def deps do
   [
     {:castore, "~> 0.1.0"},
-    {:freshness, "~> 0.1.0"}
+    {:freshness, "~> 0.2.0"}
   ]
 end
 ```
