@@ -5,7 +5,7 @@ defmodule Freshness.Server do
   """
   use GenServer
 
-  alias Freshness.{Config, Pool}
+  alias Freshness.{Config, Pool, PendingRequest, Response}
   alias Freshness.Config.MintConfig
 
   @type t() :: %__MODULE__{}
@@ -35,7 +35,7 @@ defmodule Freshness.Server do
           Mint.Types.headers(),
           body :: iodata() | nil | :stream
         ) ::
-          {:ok, list()}
+          {:ok, Response.t()}
           | {:error, term()}
   def request(server, method, path, headers \\ [], body \\ "") do
     GenServer.call(server, {:request, method, path, headers, body})
@@ -46,7 +46,8 @@ defmodule Freshness.Server do
     case Pool.checkout(pool) do
       {:ok, pool, conn} ->
         {:ok, conn, _request_ref} = Mint.HTTP.request(conn, method, path, headers, body)
-        pending = Map.put(state.pending, conn.socket, {conn, from})
+        request = %PendingRequest{connection: conn, from: from}
+        pending = Map.put(state.pending, conn.socket, request)
         {:noreply, %{state | pending: pending, pool: pool}}
 
       error ->
@@ -69,14 +70,18 @@ defmodule Freshness.Server do
       {nil, _pending} ->
         {:noreply, state}
 
-      {{conn, from}, pending} ->
+      {%PendingRequest{} = request, pending} ->
+        %{connection: conn, from: from, stream: stream} = request
+
         case Mint.HTTP.stream(conn, msg) do
           {:ok, conn, responses} ->
             if request_finished?(responses) do
-              GenServer.reply(from, {:ok, responses})
+              response = Response.generate_response([responses | stream])
+              GenServer.reply(from, response)
               {:noreply, %{state | pending: pending, pool: Pool.checkin(state.pool, conn)}}
             else
-              pending = Map.put(state.pending, socket, {conn, from})
+              request = %{request | connection: conn, stream: [responses | stream]}
+              pending = Map.put(pending, socket, request)
               {:noreply, %{state | pending: pending}}
             end
 

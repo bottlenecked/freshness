@@ -1,7 +1,7 @@
 defmodule Freshness do
   @external_resource "README.md"
   @moduledoc File.read!(@external_resource)
-  alias Freshness.{Config, Server}
+  alias Freshness.{Config, Server, Response}
 
   @doc """
   Make a GET request using the given pool
@@ -11,7 +11,7 @@ defmodule Freshness do
           path :: String.t(),
           Mint.Types.headers()
         ) ::
-          {:ok, list()}
+          {:ok, Response.t()}
           | {:error, term()}
   def get(server, path, headers \\ []), do: request(server, "GET", path, headers, "")
 
@@ -25,7 +25,7 @@ defmodule Freshness do
           Mint.Types.headers(),
           body :: iodata() | nil | :stream
         ) ::
-          {:ok, list()}
+          {:ok, Response.t()}
           | {:error, term()}
   def request(pool_name, method, path, headers \\ [], body \\ "") do
     # grab the counter

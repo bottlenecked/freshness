@@ -55,9 +55,9 @@ end
 Inside your application you can now issue requests to the configured endpoints
 
 ```elixir
-{:ok, mint_response_list} = Freshness.get("google", "/")
+{:ok, %Freshness.Response{}} = Freshness.get("google", "/")
 ...
-{:ok, mint_response_list} = Freshness.get(:bing, "/")
+{:ok, %Freshness.Response{}} = Freshness.get(:bing, "/")
 ```
 
 ### Advanced usage
