@@ -43,15 +43,15 @@ defmodule Freshness.Server do
 
   @impl true
   def handle_call({:request, method, path, headers, body}, from, %{pool: pool} = state) do
-    case Pool.checkout(pool) do
-      {:ok, pool, conn} ->
-        {:ok, conn, _request_ref} = Mint.HTTP.request(conn, method, path, headers, body)
-        request = %PendingRequest{connection: conn, from: from}
-        pending = Map.put(state.pending, conn.socket, request)
-        {:noreply, %{state | pending: pending, pool: pool}}
-
-      error ->
-        {:reply, error, state}
+    with {:checkout, {:ok, pool, conn}} <- {:checkout, Pool.checkout(pool)},
+         request_result = Mint.HTTP.request(conn, method, path, headers, body),
+         {:request, {:ok, conn, _request_ref}} <- {:request, request_result} do
+      request = %PendingRequest{connection: conn, from: from}
+      pending = Map.put(state.pending, conn.socket, request)
+      {:noreply, %{state | pending: pending, pool: pool}}
+    else
+      {:checkout, error} -> {:reply, error, state}
+      {:request, {:error, _http, reason}} -> {:reply, {:error, reason}, state}
     end
   end
 
