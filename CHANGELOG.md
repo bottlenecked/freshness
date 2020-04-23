@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.2.3
+- bug: update pool on request error
+
 ## v0.2.2
 - mapped mint request error 3-element tuple to 2-element error tuple
 
