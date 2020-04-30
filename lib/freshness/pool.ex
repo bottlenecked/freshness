@@ -41,11 +41,14 @@ defmodule Freshness.Pool do
 
   @spec checkout(t()) :: {:ok, t(), Mint.HTTP.t()} | {:error, Mint.Types.error()}
   def checkout(%__MODULE__{connections: connections} = pool) do
-    case :queue.out(connections) do
-      {{:value, conn}, rest} ->
-        {:ok, %{pool | connections: rest}, conn}
+    with {:dequeue, {{:value, conn}, rest}} <- {:dequeue, :queue.out(connections)},
+         {:open?, true, _rest} <- {:open?, Mint.HTTP.open?(conn), rest} do
+      {:ok, %{pool | connections: rest}, conn}
+    else
+      {:open?, false, rest} ->
+        checkout(%{pool | connections: rest})
 
-      {:empty, _queue} ->
+      {:dequeue, {:empty, _queue}} ->
         case Mint.HTTP.connect(pool.scheme, pool.host, pool.port, pool.opts) do
           {:ok, conn} -> {:ok, pool, conn}
           other -> other

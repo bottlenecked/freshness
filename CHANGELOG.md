@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.4
+- add Debug module
+- make sure connection is open before returning
+
 ## v0.2.3
 - bug: update pool on request error
 
