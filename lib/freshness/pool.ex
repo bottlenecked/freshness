@@ -41,14 +41,11 @@ defmodule Freshness.Pool do
 
   @spec checkout(t()) :: {:ok, t(), Mint.HTTP.t()} | {:error, Mint.Types.error()}
   def checkout(%__MODULE__{connections: connections} = pool) do
-    with {:dequeue, {{:value, conn}, rest}} <- {:dequeue, :queue.out(connections)},
-         {:open?, true, _rest} <- {:open?, Mint.HTTP.open?(conn), rest} do
-      {:ok, %{pool | connections: rest}, conn}
-    else
-      {:open?, false, rest} ->
-        checkout(%{pool | connections: rest})
+    case :queue.out(connections) do
+      {{:value, conn}, rest} ->
+        {:ok, %{pool | connections: rest}, conn}
 
-      {:dequeue, {:empty, _queue}} ->
+      {:empty, _queue} ->
         case Mint.HTTP.connect(pool.scheme, pool.host, pool.port, pool.opts) do
           {:ok, conn} -> {:ok, pool, conn}
           other -> other
@@ -59,15 +56,12 @@ defmodule Freshness.Pool do
   @spec checkin(t(), Mint.HTTP.t()) :: t()
   def checkin(pool, connection)
 
-  def checkin(%__MODULE__{} = pool, %http{state: :closed})
-      when http in [Mint.HTTP1, Mint.HTTP2] do
-    pool
-  end
-
-  def checkin(%__MODULE__{connections: connections} = pool, %http{} = conn)
+  def checkin(%__MODULE__{connections: connections} = pool, %http{state: :open} = conn)
       when http in [Mint.HTTP1, Mint.HTTP2] do
     %{pool | connections: :queue.in(conn, connections)}
   end
+
+  def checkin(%__MODULE__{} = pool, _), do: pool
 
   @spec empty?(t()) :: boolean
   def empty?(%__MODULE__{connections: connections}), do: :queue.is_empty(connections)

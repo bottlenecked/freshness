@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.5
+- add debug usage docs
+- bug: count pending connections among all open
+
 ## v0.2.4
 - add Debug module
 - make sure connection is open before returning

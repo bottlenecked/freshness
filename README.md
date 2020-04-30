@@ -7,7 +7,7 @@ It is meant as an alternative pooling option (other than e.g. [Mojito](https://g
 
 ## Installation
 
-Install the package by adding `freshness` to your list of dependencies in `mix.exs`. If you need to make https requests then you need to add the `castore` dependency too (as with Mint)
+Install the package by adding `:freshness` to your list of dependencies in `mix.exs`. If you need to make https requests then you need to add the `castore` dependency too (as with Mint)
 
 ```elixir
 def deps do
@@ -60,13 +60,22 @@ Inside your application you can now issue requests to the configured endpoints
 {:ok, %Freshness.Response{}} = Freshness.get(:bing, "/")
 ```
 
+### Debugging
+Using the `Freshness.Debug` module you can get the total count for all open connections
+```elixir
+# e.g. for a Freshness pool named :google
+iex> Freshness.Debug.connection_count(:google)
+12
+```
+_Note_: the debug functions can adversely affect the performance of a live system under load, make sure they are not called too often in production (they work by issueing `:sys.get_state/1` messages to the workers in the pool)
+
 ### Advanced usage
 If you do not know the destinations at runtime, you can start the Registry in your application.ex file as above, but start the Freshness.Supervisors under a DynamicSupervisor
 
 ## How it works
-Freshness works by creating pools of workers that each holds one or more connections to a given destination. Connections are opened lazily but are re-used, but more may be created on the spot if a given worker cannot satisfy a request. Connecting and HTTP1,2 protocol parsing and buffering are all Mint. Right now the number of open connections each worker can open is unbound.
+Freshness works by creating pools of workers that each holds one or more connections to a given destination. Freshness discovers the worker to pass a request to using the `Registry` module and an `:atomics` counter to round robin the requests to each worker in the pool. Connecting and HTTP1,2 protocol parsing and buffering are all Mint.
 
-Freshness discovers the worker to pass a request to using the `Registry` module and an `:atomics` counter to round robin the requests to each worker in the pool
+__GOTCHA__: Connections are opened lazily and re-used, but more may be created on the spot if a given worker cannot satisfy a request. Right now the number of open connections each worker can open is unbound.
 
 ## Is this production ready?
 Not by a long shot. It's barely tested. Perhaps it will be someday- right now it just serves as an exploration project.

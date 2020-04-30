@@ -16,7 +16,7 @@ defmodule Freshness.Debug do
     pid
     |> Supervisor.which_children()
     |> Enum.map(fn {_, pid, _, _} -> :sys.get_state(pid) end)
-    |> Enum.map(fn %{pool: pool} -> Pool.length(pool) end)
+    |> Enum.map(fn %{pool: pool, pending: pending} -> Pool.length(pool) + Enum.count(pending) end)
     |> Enum.sum()
   end
 end
