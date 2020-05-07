@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.3.0
+- add request timeout option
+
 ## v0.2.5
 - add debug usage docs
 - bug: count pending connections among all open

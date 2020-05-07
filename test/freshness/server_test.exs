@@ -69,4 +69,13 @@ defmodule Freshness.ServerTest do
 
     assert length(data) > 0
   end
+
+  test "timeout is respected and no ghost replies are received", %{pid_fun: fun} do
+    pid = fun.()
+    # using a very small timeout value
+    response = Server.request(pid, "GET", "/", [], "", timeout: 10)
+    assert response == {:error, :timeout}
+    # also make sure no ghost replies reach us after the timeout
+    refute_receive(_any, 500)
+  end
 end

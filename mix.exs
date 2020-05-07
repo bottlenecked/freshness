@@ -4,7 +4,7 @@ defmodule Freshness.MixProject do
   def project do
     [
       app: :freshness,
-      version: "0.2.5",
+      version: "0.3.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -26,7 +26,8 @@ defmodule Freshness.MixProject do
   defp deps do
     [
       {:mint, "~> 1.0"},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:stream_data, "~> 0.5", only: :test}
     ]
   end
 

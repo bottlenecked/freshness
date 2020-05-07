@@ -13,7 +13,7 @@ Install the package by adding `:freshness` to your list of dependencies in `mix.
 def deps do
   [
     {:castore, "~> 0.1.0"},
-    {:freshness, "~> 0.2.0"}
+    {:freshness, "~> 0.3"}
   ]
 end
 ```
@@ -58,6 +58,16 @@ Inside your application you can now issue requests to the configured endpoints
 {:ok, %Freshness.Response{}} = Freshness.get("google", "/")
 ...
 {:ok, %Freshness.Response{}} = Freshness.get(:bing, "/")
+```
+
+### Request options
+The following request options are supported (different than Mint connection options)
+* `:timeout`: Request timeout in milliseconds. If timeout expires the response will be `{:error, :timeout}`. If no timeout value is given, the default `GenServer.call/3` timeout value of 5000 applies
+
+You can pass those options as the last parameter in `Freshness.get/4` and `Freshness.request/6`
+
+```elixir
+{:ok, %Freshness.Response{}} = Freshness.get("google", "/", [], timeout: 1000)
 ```
 
 ### Debugging

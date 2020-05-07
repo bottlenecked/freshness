@@ -33,23 +33,39 @@ defmodule Freshness.Server do
           method :: String.t(),
           path :: String.t(),
           Mint.Types.headers(),
-          body :: iodata() | nil | :stream
+          body :: iodata() | nil | :stream,
+          options :: Freshness.request_options()
         ) ::
           {:ok, Response.t()}
           | {:error, term()}
-  def request(server, method, path, headers \\ [], body \\ "") do
-    GenServer.call(server, {:request, method, path, headers, body})
+  def request(server, method, path, headers \\ [], body \\ "", options \\ []) do
+    timeout = options[:timeout]
+    timeout = (timeout > 0 && timeout) || 5000
+    expiration = Utils.expiration(timeout)
+    request_params = {method, path, headers, body, expiration}
+
+    try do
+      GenServer.call(server, {:request, request_params}, timeout)
+    catch
+      :exit, {:timeout, _} -> {:error, :timeout}
+    end
   end
 
   @impl true
-  def handle_call({:request, method, path, headers, body}, from, %{pool: pool} = state) do
-    with {:checkout, {:ok, new_pool, conn}} <- {:checkout, Pool.checkout(pool)},
+  def handle_call({:request, request_params}, from, %{pool: pool} = state) do
+    {method, path, headers, body, expiration} = request_params
+
+    with {:expired?, false} <- {:expired?, Utils.expired?(expiration)},
+         {:checkout, {:ok, new_pool, conn}} <- {:checkout, Pool.checkout(pool)},
          request_result = Mint.HTTP.request(conn, method, path, headers, body),
          {:request, {:ok, conn, _request_ref}, _new_pool} <- {:request, request_result, new_pool} do
-      request = %PendingRequest{connection: conn, from: from}
+      request = %PendingRequest{connection: conn, from: from, expiration: expiration}
       pending = Map.put(state.pending, conn.socket, request)
       {:noreply, %{state | pending: pending, pool: new_pool}}
     else
+      {:expired?, true} ->
+        {:reply, {:error, :timeout}, state}
+
       {:checkout, error} ->
         {:reply, error, state}
 
@@ -75,13 +91,15 @@ defmodule Freshness.Server do
         {:noreply, state}
 
       {%PendingRequest{} = request, pending} ->
-        %{connection: conn, from: from, stream: stream} = request
+        %{connection: conn, from: from, stream: stream, expiration: expiration} = request
 
         case Mint.HTTP.stream(conn, msg) do
           {:ok, conn, responses} ->
             if request_finished?(responses) do
-              response = Response.generate_response([responses | stream])
-              GenServer.reply(from, response)
+              [responses | stream]
+              |> Response.generate_response()
+              |> reply_if_not_expired(from, expiration)
+
               {:noreply, %{state | pending: pending, pool: Pool.checkin(state.pool, conn)}}
             else
               request = %{request | connection: conn, stream: [responses | stream]}
@@ -90,7 +108,7 @@ defmodule Freshness.Server do
             end
 
           {:error, conn, reason, _responses} ->
-            GenServer.reply(from, {:error, reason})
+            reply_if_not_expired({:error, reason}, from, expiration)
             {:noreply, %{state | pending: pending, pool: Pool.checkin(state.pool, conn)}}
         end
     end
@@ -105,4 +123,10 @@ defmodule Freshness.Server do
         {:error, _, _} -> true
         _ -> false
       end)
+
+  defp reply_if_not_expired(response, to, expiration) do
+    if !Utils.expired?(expiration) do
+      GenServer.reply(to, response)
+    end
+  end
 end
